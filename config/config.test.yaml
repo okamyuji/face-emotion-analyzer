@@ -1,0 +1,83 @@
+app:
+  name: face-emotion-analyzer
+  version: 1.0.0
+  env: test
+  debug: true
+
+server:
+  port: 8080
+  host: localhost
+  read_timeout: 2s
+  write_timeout: 10s
+  idle_timeout: 30s
+  max_header_bytes: 1048576
+
+security:
+  allowed_origins: http://localhost:8080
+  csrf_token_length: 32
+  rate_limit:
+    requests_per_minute: 10000  # テスト用に高い値を設定
+    burst: 1000
+  cors:
+    allowed_methods:
+      - GET
+      - POST
+      - OPTIONS
+    allowed_headers:
+      - Content-Type
+      - X-CSRF-Token
+      - Authorization
+    max_age: 86400
+  headers:
+    strict_transport_security: max-age=0
+    content_security_policy: >
+      default-src 'self' 'unsafe-inline';
+      script-src 'self' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: blob:;
+      media-src 'self' blob:
+
+image:
+  max_size: 20971520  # 20MB（テスト用に大きめ）
+  allowed_types:
+    - image/jpeg
+    - image/png
+    - image/gif  # テスト用に追加
+  max_dimension: 8192
+  quality: 100
+
+opencv:
+  cascade_file: haarcascade_frontalface_default.xml
+  min_face_size: 20
+  scale_factor: 1.1
+  min_neighbors: 2
+  flags: 0
+
+logging:
+  level: debug
+  format: json
+  output: stdout
+  fields:
+    service: face-analyzer-test
+    version: 1.0.0
+    environment: test
+
+monitoring:
+  metrics_enabled: true
+  metrics_port: 9090
+  tracing_enabled: true
+  profiling_enabled: true
+
+testing:
+  mock_responses_enabled: true
+  skip_heavy_operations: true
+  fake_delay: 100ms
+  dummy_data_path: "./testdata"
+  cleanup_interval: 60s
+  max_test_duration: 300s
+  parallel_tests: 4
+
+performance:
+  cache_enabled: false
+  worker_pool_size: 1
+  max_concurrent_requests: 1000

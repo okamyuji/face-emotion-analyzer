@@ -1,0 +1,208 @@
+openapi: 3.0.0
+info:
+  title: Face Emotion Analyzer API
+  description: |
+    顔画像から感情を分析するAPIサービス。
+    リアルタイムの顔検出と感情分析を提供します。
+  version: 1.0.0
+  contact:
+    name: okamyuji
+    url: https://github.com/okamyuji/face-emotion-analyzer
+
+servers:
+  - url: http://localhost:8080
+    description: 開発環境
+  - url: https://api.face-emotion-analyzer.com
+    description: 本番環境
+
+tags:
+  - name: analysis
+    description: 顔認識と感情分析
+  - name: system
+    description: システム関連エンドポイント
+  - name: static
+    description: 静的ファイル
+
+paths:
+  /:
+    get:
+      summary: メインページ
+      description: 顔認識インターフェースを提供するWebページ
+      tags:
+        - static
+      responses:
+        '200':
+          description: HTMLページ
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /analyze:
+    post:
+      summary: 画像分析
+      description: |
+        アップロードされた画像から顔を検出し、感情を分析します。
+        - 複数の顔を同時に検出可能
+        - 各顔の位置情報と感情を返却
+        - 信頼度スコアも含む
+      tags:
+        - analysis
+      security:
+        - csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  description: Base64エンコードされたJPEG画像（data:image/jpeg;base64,プレフィックス付き）
+                  example: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+      responses:
+        '200':
+          description: 分析結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  faces:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        x:
+                          type: number
+                          description: 顔の左上X座標（0-1の相対値）
+                        y:
+                          type: number
+                          description: 顔の左上Y座標（0-1の相対値）
+                        width:
+                          type: number
+                          description: 顔の幅（0-1の相対値）
+                        height:
+                          type: number
+                          description: 顔の高さ（0-1の相対値）
+                  emotion:
+                    type: string
+                    description: 主要な感情
+                    enum: [喜び, 悲しみ, 怒り, 驚き, 普通]
+                  confidence:
+                    type: number
+                    description: 感情分析の信頼度（0-1）
+        '400':
+          description: 不正なリクエスト
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: 画像サイズが大きすぎる
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      summary: ヘルスチェック
+      description: サービスの稼働状態を確認
+      tags:
+        - system
+      responses:
+        '200':
+          description: サービス正常稼働中
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /metrics:
+    get:
+      summary: Prometheusメトリクス
+      description: |
+        アプリケーションの各種メトリクスを提供
+        - リクエスト統計
+        - 処理時間
+        - エラー率
+        - リソース使用状況
+        - キャッシュ効率
+        - GPU使用率
+      tags:
+        - system
+      responses:
+        '200':
+          description: Prometheusフォーマットのメトリクス
+          content:
+            text/plain:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /static/{path}:
+    get:
+      summary: 静的ファイル
+      description: CSS、JavaScript、画像などの静的ファイルを提供
+      tags:
+        - static
+      parameters:
+        - name: path
+          in: path
+          required: true
+          description: ファイルパス
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 要求されたファイル
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: ファイルが見つかりません
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: エラーメッセージ
+
+  responses:
+    InternalError:
+      description: 内部サーバーエラー
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  securitySchemes:
+    csrfToken:
+      type: apiKey
+      name: X-CSRF-Token
+      in: header
+      description: CSRFトークン
+
+security:
+  - csrfToken: []

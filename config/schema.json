@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "env": { "type": "string" },
+        "debug": { "type": "boolean" }
+      },
+      "required": ["name", "version", "env"]
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "port": { "type": "integer" },
+        "host": { "type": "string" },
+        "read_timeout": { "type": "string" },
+        "write_timeout": { "type": "string" },
+        "idle_timeout": { "type": "string" },
+        "max_header_bytes": { "type": "integer" }
+      },
+      "required": ["port", "host"]
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "allowed_origins": { "type": "string" },
+        "csrf_token_length": { "type": "integer" },
+        "rate_limit": {
+          "type": "object",
+          "properties": {
+            "requests_per_minute": { "type": "integer" },
+            "burst": { "type": "integer" }
+          }
+        },
+        "cors": {
+          "type": "object",
+          "properties": {
+            "allowed_methods": { "type": "array", "items": { "type": "string" } },
+            "allowed_headers": { "type": "array", "items": { "type": "string" } },
+            "max_age": { "type": "integer" }
+          }
+        },
+        "headers": {
+          "type": "object",
+          "properties": {
+            "strict_transport_security": { "type": "string" },
+            "content_security_policy": { "type": "string" }
+          }
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "max_size": { "type": "integer" },
+        "allowed_types": { "type": "array", "items": { "type": "string" } },
+        "max_dimension": { "type": "integer" },
+        "quality": { "type": "integer" }
+      }
+    },
+    "opencv": {
+      "type": "object",
+      "properties": {
+        "cascade_file": { "type": "string" },
+        "min_face_size": { "type": "integer" },
+        "scale_factor": { "type": "number" },
+        "min_neighbors": { "type": "integer" },
+        "flags": { "type": "integer" }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": { "type": "string" },
+        "format": { "type": "string" },
+        "output": { "type": "string" },
+        "fields": {
+          "type": "object",
+          "properties": {
+            "service": { "type": "string" },
+            "version": { "type": "string" },
+            "environment": { "type": "string" }
+          }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "metrics_enabled": { "type": "boolean" },
+        "metrics_port": { "type": "integer" },
+        "tracing_enabled": { "type": "boolean" },
+        "profiling_enabled": { "type": "boolean" }
+      }
+    }
+  },
+  "required": ["app", "server"]
+} 

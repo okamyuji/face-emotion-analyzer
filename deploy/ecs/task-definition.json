@@ -1,0 +1,122 @@
+{
+    "family": "face-emotion-analyzer",
+    "containerDefinitions": [
+        {
+            "name": "face-emotion-analyzer",
+            "image": "${ECR_REPOSITORY}:${IMAGE_TAG}",
+            "cpu": 1024,
+            "memory": 2048,
+            "essential": true,
+            "portMappings": [
+                {
+                    "containerPort": 8080,
+                    "protocol": "tcp"
+                }
+            ],
+            "healthCheck": {
+                "command": [
+                    "CMD-SHELL",
+                    "curl -f http://localhost:8080/health || exit 1"
+                ],
+                "interval": 30,
+                "timeout": 5,
+                "retries": 3,
+                "startPeriod": 60
+            },
+            "environment": [
+                {
+                    "name": "APP_ENV",
+                    "value": "production"
+                },
+                {
+                    "name": "LOG_LEVEL",
+                    "value": "info"
+                }
+            ],
+            "secrets": [
+                {
+                    "name": "APP_SECRET",
+                    "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:face-analyzer/app-secret"
+                },
+                {
+                    "name": "CSRF_TOKEN",
+                    "valueFrom": "arn:aws:secretsmanager:${AWS_REGION}:${AWS_ACCOUNT_ID}:secret:face-analyzer/csrf-token"
+                }
+            ],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/face-emotion-analyzer",
+                    "awslogs-region": "${AWS_REGION}",
+                    "awslogs-stream-prefix": "ecs"
+                }
+            },
+            "ulimits": [
+                {
+                    "name": "nofile",
+                    "softLimit": 65536,
+                    "hardLimit": 65536
+                }
+            ],
+            "mountPoints": [
+                {
+                    "sourceVolume": "opencv-models",
+                    "containerPath": "/app/models",
+                    "readOnly": true
+                }
+            ],
+            "volumesFrom": [],
+            "linuxParameters": {
+                "initProcessEnabled": true,
+                "capabilities": {
+                    "add": [
+                        "SYS_PTRACE"
+                    ]
+                },
+                "sharedMemorySize": 512
+            },
+            "systemControls": [
+                {
+                    "namespace": "kernel.shmmax",
+                    "value": "536870912"
+                },
+                {
+                    "namespace": "kernel.shmall",
+                    "value": "2097152"
+                }
+            ]
+        }
+    ],
+    "volumes": [
+        {
+            "name": "opencv-models",
+            "efsVolumeConfiguration": {
+                "fileSystemId": "${EFS_ID}",
+                "rootDirectory": "/models",
+                "transitEncryption": "ENABLED",
+                "authorizationConfig": {
+                    "accessPointId": "${EFS_ACCESS_POINT_ID}",
+                    "iam": "ENABLED"
+                }
+            }
+        }
+    ],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "networkMode": "awsvpc",
+    "cpu": "1024",
+    "memory": "2048",
+    "executionRoleArn": "${ECS_EXECUTION_ROLE_ARN}",
+    "taskRoleArn": "${ECS_TASK_ROLE_ARN}",
+    "tags": [
+        {
+            "key": "Environment",
+            "value": "production"
+        },
+        {
+            "key": "Application",
+            "value": "face-emotion-analyzer"
+        }
+    ]
+}

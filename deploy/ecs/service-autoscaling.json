@@ -1,0 +1,98 @@
+{
+    "service": "face-emotion-analyzer",
+    "cluster": "face-emotion-analyzer-cluster",
+    "minCapacity": 2,
+    "maxCapacity": 10,
+    "policies": [
+        {
+            "policyName": "cpu-scaling",
+            "policyType": "TargetTrackingScaling",
+            "targetTrackingScalingPolicyConfiguration": {
+                "targetValue": 70.0,
+                "predefinedMetricSpecification": {
+                    "predefinedMetricType": "ECSServiceAverageCPUUtilization"
+                },
+                "scaleOutCooldown": 300,
+                "scaleInCooldown": 600,
+                "disableScaleIn": false
+            }
+        },
+        {
+            "policyName": "memory-scaling",
+            "policyType": "TargetTrackingScaling",
+            "targetTrackingScalingPolicyConfiguration": {
+                "targetValue": 80.0,
+                "predefinedMetricSpecification": {
+                    "predefinedMetricType": "ECSServiceAverageMemoryUtilization"
+                },
+                "scaleOutCooldown": 300,
+                "scaleInCooldown": 600,
+                "disableScaleIn": false
+            }
+        },
+        {
+            "policyName": "request-count-scaling",
+            "policyType": "TargetTrackingScaling",
+            "targetTrackingScalingPolicyConfiguration": {
+                "targetValue": 1000.0,
+                "customizedMetricSpecification": {
+                    "metricName": "RequestCountPerTarget",
+                    "namespace": "AWS/ApplicationELB",
+                    "dimensions": [
+                        {
+                            "name": "TargetGroup",
+                            "value": "${TARGET_GROUP_ARN}"
+                        }
+                    ],
+                    "statistic": "Sum",
+                    "unit": "Count"
+                },
+                "scaleOutCooldown": 300,
+                "scaleInCooldown": 600,
+                "disableScaleIn": false
+            }
+        }
+    ],
+    "scheduledActions": [
+        {
+            "scheduledActionName": "peak-hours-scaling",
+            "schedule": "cron(0 9 ? * MON-FRI *)",
+            "minCapacity": 4,
+            "maxCapacity": 10
+        },
+        {
+            "scheduledActionName": "off-hours-scaling",
+            "schedule": "cron(0 18 ? * MON-FRI *)",
+            "minCapacity": 2,
+            "maxCapacity": 6
+        }
+    ],
+    "alarms": [
+        {
+            "alarmName": "service-high-cpu",
+            "metricName": "CPUUtilization",
+            "namespace": "AWS/ECS",
+            "statistic": "Average",
+            "period": 300,
+            "evaluationPeriods": 2,
+            "threshold": 85,
+            "comparisonOperator": "GreaterThanThreshold",
+            "alarmActions": [
+                "${SNS_TOPIC_ARN}"
+            ]
+        },
+        {
+            "alarmName": "service-high-memory",
+            "metricName": "MemoryUtilization",
+            "namespace": "AWS/ECS",
+            "statistic": "Average",
+            "period": 300,
+            "evaluationPeriods": 2,
+            "threshold": 85,
+            "comparisonOperator": "GreaterThanThreshold",
+            "alarmActions": [
+                "${SNS_TOPIC_ARN}"
+            ]
+        }
+    ]
+}

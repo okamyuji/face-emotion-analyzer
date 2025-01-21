@@ -1,0 +1,89 @@
+app:
+  name: face-emotion-analyzer
+  version: 1.0.0
+  env: production
+  debug: false
+
+server:
+  port: 8080
+  host: 0.0.0.0
+  read_timeout: 5s
+  write_timeout: 30s
+  idle_timeout: 120s
+  max_header_bytes: 1048576
+
+security:
+  allowed_origins: https://app.okamyuji.com
+  csrf_token_length: 32
+  rate_limit:
+    requests_per_minute: 100
+    burst: 50
+  cors:
+    allowed_methods:
+      - GET
+      - POST
+      - OPTIONS
+    allowed_headers:
+      - Content-Type
+      - X-CSRF-Token
+      - Authorization
+    max_age: 86400
+  headers:
+    strict_transport_security: max-age=31536000; includeSubDomains; preload
+    content_security_policy: >
+      default-src 'self';
+      script-src 'self';
+      style-src 'self';
+      img-src 'self' data: blob:;
+      media-src 'self' blob:;
+      connect-src 'self';
+      frame-ancestors 'none';
+      form-action 'self';
+      base-uri 'self'
+
+image:
+  max_size: 5242880  # 5MB
+  allowed_types:
+    - image/jpeg
+    - image/png
+  max_dimension: 2048
+  quality: 85
+
+opencv:
+  cascade_file: haarcascade_frontalface_default.xml
+  min_face_size: 40
+  scale_factor: 1.2
+  min_neighbors: 4
+  flags: 0
+
+logging:
+  level: info
+  format: json
+  output: /var/log/face-analyzer/app.log
+  fields:
+    service: face-analyzer
+    version: 1.0.0
+    environment: production
+
+monitoring:
+  metrics_enabled: true
+  metrics_port: 9090
+  tracing_enabled: true
+  profiling_enabled: false
+
+performance:
+  cache_enabled: true
+  cache_size: 1000
+  cache_ttl: 3600
+  worker_pool_size: 4
+  max_concurrent_requests: 100
+  compression_enabled: true
+  compression_level: 6
+
+scaling:
+  min_instances: 2
+  max_instances: 10
+  target_cpu_utilization: 70
+  target_memory_utilization: 80
+  scale_up_cooldown: 300
+  scale_down_cooldown: 600

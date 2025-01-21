@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: face-emotion-analyzer
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - LOG_LEVEL=info
+      - ALLOWED_ORIGINS=http://localhost:8080
+    volumes:
+      - ./models:/app/models
+      - ./config:/app/config
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  opencv-dev:
+    image: opencv-dev
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: face-emotion-analyzer-dev
+    volumes:
+      - .:/app
+      - go-cache:/go/pkg/mod
+    environment:
+      - APP_ENV=development
+      - DEBUG=true
+      - LOG_LEVEL=debug
+      - ALLOWED_ORIGINS=http://localhost:8080
+    ports:
+      - "8081:8080"
+    command: ["air", "-c", ".air.toml"]
+
+volumes:
+  go-cache:
+    driver: local

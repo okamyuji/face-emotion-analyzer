@@ -1,0 +1,81 @@
+# Goの一般的な無視ファイル
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# バイナリ
+bin/
+build/
+
+# 依存関係
+vendor/
+
+# IDEとエディタ
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS固有
+.DS_Store
+Thumbs.db
+
+# アプリケーション固有
+tmp/
+logs/
+*.log
+coverage.txt
+coverage.html
+
+# 環境変数
+.env
+.env.*
+!.env.example
+
+# キャッシュ
+.cache/
+*.cache
+
+# テストカバレッジ
+coverage/
+
+# デバッグファイル
+debug
+__debug_bin
+
+# AIモデル
+*.pth
+*.pt
+*.onnx
+*.pb
+
+# OpenCV関連
+*.cascade
+*.xml
+!models/*.xml
+
+# ドキュメント生成
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# ノートブック
+*.ipynb
+.ipynb_checkpoints/
+
+# デプロイメント
+*.pem
+*.key
+*.crt
+
+# その他
+.air.toml
+node_modules/
+dist/
+*.bak

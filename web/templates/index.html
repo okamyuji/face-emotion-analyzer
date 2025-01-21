@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ .CSRFToken }}">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+    
+    <!-- SEOメタタグ -->
+    <title>顔表情分析 - リアルタイム感情認識アプリ</title>
+    <meta name="description" content="ブラウザから簡単に利用できる顔表情分析ツール。OpenCVを使用したリアルタイムの感情認識が可能です。">
+    <meta name="keywords" content="顔認識, 感情分析, OpenCV, WebRTC, リアルタイム分析">
+    
+    <!-- Open Graph プロトコル -->
+    <meta property="og:title" content="顔表情分析 - リアルタイム感情認識">
+    <meta property="og:description" content="ブラウザベースの高度な顔表情分析ツール">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://okamyuji.com/face-analyzer">
+    
+    <!-- セキュリティヘッダー -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self'; 
+        script-src 'self' 'unsafe-inline'; 
+        style-src 'self' 'unsafe-inline'; 
+        font-src 'self' data:; 
+        img-src 'self' data: blob:;
+        media-device 'self';
+        camera 'self'
+    ">
+
+    <!-- スタイルシート -->
+    <link rel="stylesheet" href="/static/css/style.css" nonce="{{ .CSPNonce }}">
+    
+    <!-- インラインスタイル -->
+    <style nonce="{{ .CSPNonce }}">
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-8" data-csrf-token="{{ .CSRFToken }}">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">顔表情分析</h1>
+            <p class="text-gray-600">リアルタイムで感情を分析</p>
+        </header>
+
+        <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6">
+            <div class="mb-6">
+                <div class="relative aspect-video bg-gray-200 rounded-lg overflow-hidden">
+                    <video id="video" class="w-full h-full object-cover" autoplay playsinline></video>
+                    <canvas id="overlay" class="absolute top-0 left-0 w-full h-full"></canvas>
+                </div>
+            </div>
+
+            <div class="flex justify-center space-x-4 mb-6">
+                <button id="startButton" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    カメラ開始
+                </button>
+                <button id="captureButton" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2" disabled>
+                    撮影
+                </button>
+                <button id="stopButton" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2" disabled>
+                    停止
+                </button>
+            </div>
+
+            <div id="result" class="hidden">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-4">分析結果</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700 mb-2">主要な感情</h3>
+                        <p id="primaryEmotion" class="text-lg text-blue-600"></p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-medium text-gray-700 mb-2">信頼度</h3>
+                        <p id="confidence" class="text-lg text-green-600"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- メインスクリプト -->
+    <script src="/static/js/app.js" nonce="{{ .CSPNonce }}"></script>
+</body>
+</html>

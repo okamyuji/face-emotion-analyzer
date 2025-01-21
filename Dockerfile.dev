@@ -1,0 +1,40 @@
+# 開発環境用Dockerfile
+FROM golang:1.21-bullseye
+
+# 開発用ツールのインストール
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    pkg-config \
+    libopencv-dev \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Air（ホットリロード用）のインストール
+RUN curl -sSfL https://raw.githubusercontent.com/cosmtrek/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+# 開発用ツールのインストール
+RUN go install github.com/go-delve/delve/cmd/dlv@latest && \
+    go install golang.org/x/tools/gopls@latest && \
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest && \
+    go install golang.org/x/tools/cmd/goimports@latest && \
+    go install honnef.co/go/tools/cmd/staticcheck@latest
+
+WORKDIR /app
+
+# 開発用の設定ファイルをコピー
+COPY .air.toml ./
+COPY go.mod go.sum ./
+
+# 依存関係のダウンロード
+RUN go mod download
+
+# Goのパスを設定
+ENV PATH="/go/bin:${PATH}"
+
+# デバッグポートを公開
+EXPOSE 8080 2345
+
+# デフォルトコマンド
+CMD ["air", "-c", ".air.toml"]
