@@ -63,8 +63,7 @@ func (l *ConfigLoader) LoadConfig() (*Config, error) {
 
 // 指定された設定ファイルを読み込む
 func (l *ConfigLoader) loadConfigFile(filename string) (*Config, error) {
-	filepath := filepath.Join(l.configDir, filename)
-	data, err := os.ReadFile(filepath)
+	data, err := l.loadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +74,26 @@ func (l *ConfigLoader) loadConfigFile(filename string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// 指定されたファイルを読み込む
+func (l *ConfigLoader) loadFile(filename string) ([]byte, error) {
+	// パスのバリデーション
+	if !strings.HasSuffix(filename, ".yaml") && !strings.HasSuffix(filename, ".yml") {
+		return nil, fmt.Errorf("不正なファイル形式です: %s", filename)
+	}
+
+	cleanPath := filepath.Clean(filename)
+	if strings.Contains(cleanPath, "..") {
+		return nil, fmt.Errorf("不正なファイルパスです: %s", filename)
+	}
+
+	filepath := filepath.Join(l.configDir, cleanPath)
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("設定ファイルの読み込みに失敗: %w", err)
+	}
+	return data, nil
 }
 
 // 2つの設定をマージする

@@ -29,7 +29,7 @@ type JSONHandler struct {
 func NewLogger(cfg *config.LoggingConfig) (*Logger, error) {
 	var output io.Writer = os.Stdout
 	if cfg.Output != "stdout" {
-		file, err := os.OpenFile(cfg.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(cfg.Output, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err != nil {
 			return nil, fmt.Errorf("ログファイルのオープンに失敗: %w", err)
 		}

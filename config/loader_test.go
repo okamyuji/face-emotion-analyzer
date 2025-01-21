@@ -5,281 +5,273 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigLoader_LoadConfig(t *testing.T) {
-	// テスト用の一時ディレクトリを作成
-	tempDir := t.TempDir()
+	// テスト前に環境をクリーン
+	originalEnv := os.Getenv("APP_ENV")
+	defer os.Setenv("APP_ENV", originalEnv)
+	os.Unsetenv("APP_ENV")
 
-	// テスト用の設定ファイルを作成
-	baseConfig := `
+	tests := []struct {
+		name     string
+		setup    func(dir string) error
+		env      map[string]string
+		wantErr  bool
+		validate func(*testing.T, *Config)
+	}{
+		{
+			name: "基本設定の読み込み",
+			setup: func(dir string) error {
+				baseConfig := `
 app:
-  name: test-app
-  version: 1.0.0
-  env: development
+  name: "face-emotion-analyzer"
+  env: "development"
+  debug: true
 server:
   port: "8080"
-  host: localhost
-image:
-  max_size: 10485760
-  max_dimension: 1920
-  quality: 90
-  allowed_types:
-    - image/jpeg
-opencv:
-  min_face_size: 30
-  scale_factor: 1.1
-  min_neighbors: 3
+  host: "localhost"
 security:
   csrf_token_length: 32
   rate_limit:
     requests_per_minute: 100
-    burst: 50
+image:
+  max_size: 5242880
+opencv:
+  scale_factor: 1.1
 `
-	if err := os.WriteFile(filepath.Join(tempDir, "config.yaml"), []byte(baseConfig), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// 環境固有の設定ファイルを作成
-	devConfig := `
+				devConfig := `
 app:
-  env: development
   debug: true
+server:
+  host: "localhost"
 `
-	if err := os.WriteFile(filepath.Join(tempDir, "config.development.yaml"), []byte(devConfig), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	loader := NewConfigLoader(tempDir)
-
-	tests := []struct {
-		name    string
-		envVars map[string]string
-		want    *Config
-		wantErr bool
-	}{
-		{
-			name: "基本設定の読み込み",
-			envVars: map[string]string{
-				"APP_ENV": "development",
+				if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(baseConfig), 0644); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(dir, "config.development.yaml"), []byte(devConfig), 0644)
 			},
-			want: &Config{
-				App: struct {
-					Name    string `yaml:"name"`
-					Version string `yaml:"version"`
-					Env     string `yaml:"env"`
-					Debug   bool   `yaml:"debug"`
-				}{
-					Name:    "test-app",
-					Version: "1.0.0",
-					Env:     "development",
-					Debug:   true,
-				},
-				Server: ServerConfig{
-					Port:           "8080",
-					Host:           "localhost",
-					ReadTimeout:    5 * time.Second,
-					WriteTimeout:   30 * time.Second,
-					IdleTimeout:    120 * time.Second,
-					MaxHeaderBytes: 1048576,
-				},
-				Image: ImageConfig{
-					MaxSize:      10485760,
-					MaxDimension: 1920,
-					Quality:      90,
-					AllowedTypes: []string{"image/jpeg"},
-				},
-				OpenCV: OpenCVConfig{
-					MinFaceSize:  30,
-					ScaleFactor:  1.1,
-					MinNeighbors: 3,
-				},
-				Security: SecurityConfig{
-					CSRFTokenLength: 32,
-					RateLimit: RateLimitConfig{
-						RequestsPerMinute: 100,
-						Burst:             50,
-					},
-				},
+			validate: func(t *testing.T, cfg *Config) {
+				require.NotNil(t, cfg)
+				assert.Equal(t, "face-emotion-analyzer", cfg.App.Name)
+				assert.Equal(t, "8080", cfg.Server.Port)
+				assert.Equal(t, "development", cfg.App.Env)
+				assert.True(t, cfg.App.Debug)
 			},
-			wantErr: false,
 		},
 		{
 			name: "環境変数による上書き",
-			envVars: map[string]string{
+			setup: func(dir string) error {
+				config := `
+app:
+  name: "face-emotion-analyzer"
+  env: "development"
+server:
+  port: "8080"
+security:
+  csrf_token_length: 32
+image:
+  max_size: 5242880
+opencv:
+  scale_factor: 1.1
+`
+				if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0644); err != nil {
+					return err
+				}
+
+				prodConfig := `
+app:
+  env: "production"
+server:
+  port: "80"
+image:
+  max_size: 5242880
+`
+				if err := os.WriteFile(filepath.Join(dir, "config.production.yaml"), []byte(prodConfig), 0644); err != nil {
+					return err
+				}
+
+				testConfig := `
+app:
+  env: "test"
+server:
+  port: "8081"
+image:
+  max_size: 5242880
+opencv:
+  scale_factor: 1.1
+`
+				return os.WriteFile(filepath.Join(dir, "config.test.yaml"), []byte(testConfig), 0644)
+			},
+			env: map[string]string{
 				"APP_ENV": "production",
-				"PORT":    "9090",
+				"PORT":    "3000",
 			},
-			want: &Config{
-				App: struct {
-					Name    string `yaml:"name"`
-					Version string `yaml:"version"`
-					Env     string `yaml:"env"`
-					Debug   bool   `yaml:"debug"`
-				}{
-					Name:    "test-app",
-					Version: "1.0.0",
-					Env:     "production",
-					Debug:   false,
-				},
-				Server: ServerConfig{
-					Port:           "9090",
-					Host:           "localhost",
-					ReadTimeout:    5 * time.Second,
-					WriteTimeout:   30 * time.Second,
-					IdleTimeout:    120 * time.Second,
-					MaxHeaderBytes: 1048576,
-				},
-				Image: ImageConfig{
-					MaxSize:      10485760,
-					MaxDimension: 1920,
-					Quality:      90,
-					AllowedTypes: []string{"image/jpeg"},
-				},
-				OpenCV: OpenCVConfig{
-					MinFaceSize:  30,
-					ScaleFactor:  1.1,
-					MinNeighbors: 3,
-				},
-				Security: SecurityConfig{
-					CSRFTokenLength: 32,
-					RateLimit: RateLimitConfig{
-						RequestsPerMinute: 100,
-						Burst:             50,
-					},
-				},
+			validate: func(t *testing.T, cfg *Config) {
+				assert.Equal(t, "production", cfg.App.Env)
+				assert.Equal(t, "3000", cfg.Server.Port)
 			},
-			wantErr: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// 環境変数を設定
-			for k, v := range tt.envVars {
-				os.Setenv(k, v)
-				defer os.Unsetenv(k)
+			// テスト用の一時ディレクトリを作成
+			dir := t.TempDir()
+
+			// 設定ファイルの作成
+			if tt.setup != nil {
+				err := tt.setup(dir)
+				require.NoError(t, err)
 			}
 
-			got, err := loader.LoadConfig()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("LoadConfig() error = %v, wantErr %v", err, tt.wantErr)
+			// 環境変数の設定
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			// ConfigLoaderの作成とテスト
+			loader := NewConfigLoader(dir)
+			cfg, err := loader.LoadConfig()
+
+			if tt.wantErr {
+				assert.Error(t, err)
 				return
 			}
 
-			if !tt.wantErr {
-				// 基本的なフィールドの比較
-				if got.App.Name != tt.want.App.Name {
-					t.Errorf("App.Name = %v, want %v", got.App.Name, tt.want.App.Name)
-				}
-				if got.App.Version != tt.want.App.Version {
-					t.Errorf("App.Version = %v, want %v", got.App.Version, tt.want.App.Version)
-				}
-				if got.Server.Port != tt.want.Server.Port {
-					t.Errorf("Server.Port = %v, want %v", got.Server.Port, tt.want.Server.Port)
-				}
-				if got.Image.MaxSize != tt.want.Image.MaxSize {
-					t.Errorf("Image.MaxSize = %v, want %v", got.Image.MaxSize, tt.want.Image.MaxSize)
-				}
+			require.NoError(t, err)
+			require.NotNil(t, cfg)
+			if tt.validate != nil {
+				tt.validate(t, cfg)
 			}
 		})
 	}
 }
 
 func TestConfigLoader_WatchConfig(t *testing.T) {
-	tempDir := t.TempDir()
+	// テスト前に環境をクリーン
+	originalEnv := os.Getenv("APP_ENV")
+	defer os.Setenv("APP_ENV", originalEnv)
+	os.Unsetenv("APP_ENV")
 
-	// 初期設定ファイルを作成
+	dir := t.TempDir()
+
 	initialConfig := `
 app:
-  name: test-app
-  version: 1.0.0
+  name: "face-emotion-analyzer"
+  env: "development"
 server:
   port: "8080"
+security:
+  csrf_token_length: 32
 image:
-  max_size: 10485760
-  max_dimension: 1920
+  max_size: 5242880
 opencv:
   scale_factor: 1.1
 `
-	configFile := filepath.Join(tempDir, "config.yaml")
-	if err := os.WriteFile(configFile, []byte(initialConfig), 0644); err != nil {
-		t.Fatal(err)
-	}
+	devConfig := `
+app:
+  debug: true
+server:
+  host: "localhost"
+`
+	testConfig := `
+app:
+  env: "test"
+server:
+  port: "8081"
+image:
+  max_size: 5242880
+opencv:
+  scale_factor: 1.1
+`
+	configPath := filepath.Join(dir, "config.yaml")
+	err := os.WriteFile(configPath, []byte(initialConfig), 0644)
+	require.NoError(t, err)
 
-	loader := NewConfigLoader(tempDir)
+	err = os.WriteFile(filepath.Join(dir, "config.development.yaml"), []byte(devConfig), 0644)
+	require.NoError(t, err)
 
-	// 設定変更を検知するチャネル
-	changes := make(chan *Config, 1)
+	err = os.WriteFile(filepath.Join(dir, "config.test.yaml"), []byte(testConfig), 0644)
+	require.NoError(t, err)
 
-	// 監視を開始
-	err := loader.WatchConfig(func(cfg *Config) {
-		changes <- cfg
+	loader := NewConfigLoader(dir)
+	configChanged := make(chan *Config, 1)
+
+	err = loader.WatchConfig(func(cfg *Config) {
+		configChanged <- cfg
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// 設定ファイルを更新
 	updatedConfig := `
 app:
-  name: test-app-updated
-  version: 1.0.1
+  name: "face-emotion-analyzer"
+  env: "development"
 server:
-  port: "8080"
+  port: "3000"
+security:
+  csrf_token_length: 32
 image:
-  max_size: 10485760
-  max_dimension: 1920
+  max_size: 5242880
 opencv:
   scale_factor: 1.1
 `
-	time.Sleep(100 * time.Millisecond) // ファイルシステムの更新を確実にするため
-	if err := os.WriteFile(configFile, []byte(updatedConfig), 0644); err != nil {
-		t.Fatal(err)
-	}
+	time.Sleep(100 * time.Millisecond)
+	err = os.WriteFile(configPath, []byte(updatedConfig), 0644)
+	require.NoError(t, err)
 
-	// 変更の検知を待機
 	select {
-	case cfg := <-changes:
-		if cfg.App.Name != "test-app-updated" {
-			t.Errorf("App.Name = %v, want test-app-updated", cfg.App.Name)
-		}
-		if cfg.App.Version != "1.0.1" {
-			t.Errorf("App.Version = %v, want 1.0.1", cfg.App.Version)
-		}
+	case cfg := <-configChanged:
+		assert.Equal(t, "3000", cfg.Server.Port)
 	case <-time.After(2 * time.Second):
-		t.Error("設定の変更が検知されませんでした")
+		t.Fatal("設定の変更が検知されませんでした")
 	}
 }
 
 func TestConfigLoader_ValidateConfig(t *testing.T) {
-	tempDir := t.TempDir()
+	// テスト前に環境をクリーン
+	originalEnv := os.Getenv("APP_ENV")
+	defer os.Setenv("APP_ENV", originalEnv)
+	os.Unsetenv("APP_ENV")
 
 	tests := []struct {
 		name       string
 		config     string
+		devConfig  string
+		testConfig string
 		wantErr    bool
-		errMessage string
+		errMsg     string
 	}{
 		{
 			name: "有効な設定",
 			config: `
 app:
-  name: test-app
-  version: 1.0.0
+  name: "face-emotion-analyzer"
+  env: "development"
 server:
   port: "8080"
 security:
   csrf_token_length: 32
-  rate_limit:
-    requests_per_minute: 100
 image:
-  max_size: 10485760
-  max_dimension: 1920
-  allowed_types:
-    - image/jpeg
+  max_size: 5242880
 opencv:
-  min_face_size: 30
+  scale_factor: 1.1
+`,
+			devConfig: `
+app:
+  debug: true
+`,
+			testConfig: `
+app:
+  env: "test"
+server:
+  port: "8081"
+image:
+  max_size: 5242880
+opencv:
   scale_factor: 1.1
 `,
 			wantErr: false,
@@ -288,54 +280,103 @@ opencv:
 			name: "アプリケーション名なし",
 			config: `
 app:
-  version: 1.0.0
+  env: "development"
 server:
   port: "8080"
+security:
+  csrf_token_length: 32
 image:
-  max_size: 10485760
+  max_size: 5242880
+`,
+			devConfig: `
+app:
+  debug: true
+`,
+			testConfig: `
+app:
+  env: "test"
+server:
+  port: "8081"
+image:
+  max_size: 5242880
 opencv:
   scale_factor: 1.1
 `,
-			wantErr:    true,
-			errMessage: "設定の検証に失敗: アプリケーション名が設定されていません",
+			wantErr: true,
+			errMsg:  "設定の検証に失敗: アプリケーション名が設定されていません",
 		},
 		{
 			name: "不正なCSRFトークン長",
 			config: `
 app:
-  name: test-app
-  version: 1.0.0
+  name: "face-emotion-analyzer"
+  env: "development"
+  debug: false
 server:
   port: "8080"
+  host: "localhost"
 security:
   csrf_token_length: 16
+  rate_limit:
+    requests_per_minute: 100
 image:
-  max_size: 10485760
+  max_size: 5242880
 opencv:
-  scale_factor: 1.1
+  scale_factor: 1.2
+logging:
+  level: "info"
+  format: "json"
 `,
-			wantErr:    true,
-			errMessage: "設定の検証に失敗: CSRFトークンの長さは32以上である必要があります",
+			devConfig: `
+app:
+  debug: true
+server:
+  host: "localhost"
+opencv:
+  scale_factor: 1.2
+logging:
+  level: "debug"
+`,
+			testConfig: `
+app:
+  env: "test"
+server:
+  port: "8081"
+image:
+  max_size: 5242880
+opencv:
+  scale_factor: 1.2
+logging:
+  level: "debug"
+`,
+			wantErr: true,
+			errMsg:  "設定の検証に失敗: CSRFトークンの長さは32以上である必要があります",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			configFile := filepath.Join(tempDir, "config.yaml")
-			if err := os.WriteFile(configFile, []byte(tt.config), 0644); err != nil {
-				t.Fatal(err)
-			}
+			dir := t.TempDir()
+			configPath := filepath.Join(dir, "config.yaml")
+			err := os.WriteFile(configPath, []byte(tt.config), 0644)
+			require.NoError(t, err)
 
-			loader := NewConfigLoader(tempDir)
-			err := loader.ValidateConfig()
+			devConfigPath := filepath.Join(dir, "config.development.yaml")
+			err = os.WriteFile(devConfigPath, []byte(tt.devConfig), 0644)
+			require.NoError(t, err)
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			testConfigPath := filepath.Join(dir, "config.test.yaml")
+			err = os.WriteFile(testConfigPath, []byte(tt.testConfig), 0644)
+			require.NoError(t, err)
 
-			if tt.wantErr && err != nil && err.Error() != tt.errMessage {
-				t.Errorf("ValidateConfig() error message = %v, want %v", err.Error(), tt.errMessage)
+			loader := NewConfigLoader(dir)
+			err = loader.ValidateConfig()
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
 			}
 		})
 	}

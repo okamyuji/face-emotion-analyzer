@@ -143,7 +143,9 @@ func BenchmarkHTTPEndpoint(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			b.Errorf("レスポンスボディのクローズに失敗: %v", err)
+		}
 	}
 }
 

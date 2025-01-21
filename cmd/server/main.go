@@ -75,12 +75,16 @@ func generateCSRFToken() string {
 func initEnvironment() *slog.Logger {
 	// 環境変数の設定
 	if os.Getenv("APP_ENV") == "" {
-		os.Setenv("APP_ENV", "development")
+		if err := os.Setenv("APP_ENV", "development"); err != nil {
+			slog.Error("環境変数の設定に失敗", "error", err)
+		}
 	}
 
 	// CSRFトークンを生成して設定
 	csrfToken := generateCSRFToken()
-	os.Setenv("CSRF_TOKEN", csrfToken)
+	if err := os.Setenv("CSRF_TOKEN", csrfToken); err != nil {
+		slog.Error("CSRFトークンの設定に失敗", "error", err)
+	}
 
 	// 構造化ロギングをセットアップ
 	var handler slog.Handler
