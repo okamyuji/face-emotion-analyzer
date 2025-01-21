@@ -2,7 +2,9 @@ package analyzer
 
 import (
 	"context"
+	"fmt"
 	"image"
+	"log"
 	"runtime"
 	"sync"
 
@@ -23,9 +25,14 @@ type ResourceManager struct {
 
 // 新しいResourceManagerを作成
 func NewResourceManager(cascadeFile string, useGPU bool, maxPoolSize int) (*ResourceManager, error) {
+	if cascadeFile == "" {
+		return nil, fmt.Errorf("カスケード分類器のファイルパスが指定されていません")
+	}
+
 	cascade := gocv.NewCascadeClassifier()
 	if !cascade.Load(cascadeFile) {
-		return nil, errors.OpenCVError("カスケード分類器の読み込み", nil)
+		cascade.Close()
+		return nil, fmt.Errorf("カスケード分類器の読み込みに失敗: %s", cascadeFile)
 	}
 
 	rm := &ResourceManager{
@@ -46,7 +53,9 @@ func NewResourceManager(cascadeFile string, useGPU bool, maxPoolSize int) (*Reso
 
 	// ファイナライザーの登録
 	runtime.SetFinalizer(rm, func(rm *ResourceManager) {
-		rm.Close()
+		if err := rm.Close(); err != nil {
+			log.Printf("リソースマネージャーのクリーンアップに失敗: %v", err)
+		}
 	})
 
 	return rm, nil
@@ -69,13 +78,18 @@ func (rm *ResourceManager) AcquireMat() (*gocv.Mat, error) {
 }
 
 // Matリソースを解放
-func (rm *ResourceManager) ReleaseMat(mat *gocv.Mat) {
-	if mat == nil || mat.Empty() {
-		return
+func (rm *ResourceManager) ReleaseMat(mat *gocv.Mat) error {
+	if rm == nil {
+		return fmt.Errorf("リソースマネージャーがnilです")
+	}
+	if mat == nil {
+		return fmt.Errorf("マトリックスがnilです")
 	}
 
-	mat.Close()
+	// 新しいマトリックスを作成してプールに戻す
+	*mat = gocv.NewMat()
 	rm.pool.Put(mat)
+	return nil
 }
 
 // 画像を処理
@@ -121,22 +135,23 @@ func (rm *ResourceManager) processOnGPU(ctx context.Context, gpuMat *gocv.Mat) e
 
 // リソースを解放
 func (rm *ResourceManager) Close() error {
-	rm.mu.Lock()
-	defer rm.mu.Unlock()
-
-	if rm.closed {
-		return nil
-	}
+	var errs []error
 
 	if rm.cascade != nil {
-		rm.cascade.Close()
+		if err := rm.cascade.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("カスケード分類器のクローズに失敗: %w", err))
+		}
 	}
 
 	if rm.gpuMat != nil {
-		rm.gpuMat.Close()
+		if err := rm.gpuMat.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("GPUマトリックスのクローズに失敗: %w", err))
+		}
 	}
 
-	rm.closed = true
+	if len(errs) > 0 {
+		return fmt.Errorf("リソースのクリーンアップに失敗: %v", errs)
+	}
 	return nil
 }
 

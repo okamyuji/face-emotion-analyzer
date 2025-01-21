@@ -88,8 +88,21 @@ func (l *ConfigLoader) loadFile(filename string) ([]byte, error) {
 		return nil, fmt.Errorf("不正なファイルパスです: %s", filename)
 	}
 
-	filepath := filepath.Join(l.configDir, cleanPath)
-	data, err := os.ReadFile(filepath)
+	// 設定ディレクトリ内のパスであることを確認
+	filePath := filepath.Join(l.configDir, cleanPath)
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("パスの解決に失敗: %w", err)
+	}
+	absConfigDir, err := filepath.Abs(l.configDir)
+	if err != nil {
+		return nil, fmt.Errorf("設定ディレクトリの解決に失敗: %w", err)
+	}
+	if !strings.HasPrefix(absPath, absConfigDir) {
+		return nil, fmt.Errorf("不正なファイルパス: ディレクトリトラバーサルの試行")
+	}
+
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("設定ファイルの読み込みに失敗: %w", err)
 	}
@@ -185,7 +198,46 @@ func (l *ConfigLoader) GetConfigValue(path string) (interface{}, error) {
 	return current, nil
 }
 
-// 指定されたパスに設定値を設定
+// 設定ファイルを保存
+func (l *ConfigLoader) saveConfigFile(filename string, data []byte) error {
+	// パスのバリデーション
+	if !strings.HasSuffix(filename, ".yaml") && !strings.HasSuffix(filename, ".yml") {
+		return fmt.Errorf("不正なファイル形式です: %s", filename)
+	}
+
+	cleanPath := filepath.Clean(filename)
+	if strings.Contains(cleanPath, "..") {
+		return fmt.Errorf("不正なファイルパスです: %s", filename)
+	}
+
+	filePath := filepath.Join(l.configDir, cleanPath)
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return fmt.Errorf("パスの解決に失敗: %w", err)
+	}
+	absConfigDir, err := filepath.Abs(l.configDir)
+	if err != nil {
+		return fmt.Errorf("設定ディレクトリの解決に失敗: %w", err)
+	}
+	if !strings.HasPrefix(absPath, absConfigDir) {
+		return fmt.Errorf("不正なファイルパス: ディレクトリトラバーサルの試行")
+	}
+
+	// ディレクトリが存在することを確認
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("ディレクトリの作成に失敗: %w", err)
+	}
+
+	// ファイルを保存
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
+		return fmt.Errorf("ファイルの保存に失敗: %w", err)
+	}
+
+	return nil
+}
+
+// SetConfigValueの修正
 func (l *ConfigLoader) SetConfigValue(path string, value interface{}) error {
 	config, err := l.LoadConfig()
 	if err != nil {
@@ -215,12 +267,7 @@ func (l *ConfigLoader) SetConfigValue(path string, value interface{}) error {
 		return fmt.Errorf("YAML形式への変換に失敗: %w", err)
 	}
 
-	filename := filepath.Join(l.configDir, "config.yaml")
-	if err := os.WriteFile(filename, data, 0644); err != nil {
-		return fmt.Errorf("設定ファイルの保存に失敗: %w", err)
-	}
-
-	return nil
+	return l.saveConfigFile("config.yaml", data)
 }
 
 // 設定の検証
@@ -344,4 +391,9 @@ func (l *ConfigLoader) SaveAsTemplate(templateName string) error {
 
 	filename := filepath.Join(templatesDir, templateName+".yaml")
 	return os.WriteFile(filename, data, 0644)
+}
+
+// SaveTemplateの修正
+func (l *ConfigLoader) SaveTemplate(templateName string, data []byte) error {
+	return l.saveConfigFile(filepath.Join("templates", templateName+".yaml"), data)
 }

@@ -3,6 +3,7 @@ package testutil
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -11,7 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,25 +102,32 @@ func CreateTestImageBase64(t *testing.T, width, height int) string {
 	return "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(imgData)
 }
 
-// テストデータファイルを読み込む
-func LoadTestFile(t *testing.T, filename string) []byte {
-	t.Helper()
-
-	// テストデータのディレクトリを特定
-	_, currentFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("ソースファイルの場所を特定できません")
+// ファイルの読み込みを安全に行う
+func ReadTestFile(filePath string, allowedDir string) ([]byte, error) {
+	// パスのバリデーション
+	cleanPath := filepath.Clean(filePath)
+	if strings.Contains(cleanPath, "..") {
+		return nil, fmt.Errorf("不正なファイルパスです: %s", filePath)
 	}
 
-	testDataDir := filepath.Join(filepath.Dir(currentFile), "../../testdata")
-	filePath := filepath.Join(testDataDir, filename)
+	// 許可されたディレクトリ内のパスであることを確認
+	absPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("パスの解決に失敗: %w", err)
+	}
+	absAllowedDir, err := filepath.Abs(allowedDir)
+	if err != nil {
+		return nil, fmt.Errorf("許可されたディレクトリの解決に失敗: %w", err)
+	}
+	if !strings.HasPrefix(absPath, absAllowedDir) {
+		return nil, fmt.Errorf("不正なファイルパス: 許可されていないディレクトリ")
+	}
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		t.Fatalf("テストファイルの読み込みに失敗: %v", err)
+		return nil, fmt.Errorf("ファイルの読み込みに失敗: %w", err)
 	}
-
-	return data
+	return data, nil
 }
 
 // HTTPレスポンスを比較
