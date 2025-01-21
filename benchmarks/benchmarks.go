@@ -59,7 +59,7 @@ func BenchmarkFaceAnalysis(b *testing.B) {
 	}
 
 	// アナライザーの初期化
-	analyzer := analyzer.New(&cascade)
+	analyzer := analyzer.New(&cascade, "", "", false)
 
 	// テスト画像の生成
 	imgData := generateTestImage(b, 640, 480)
@@ -83,7 +83,7 @@ func BenchmarkConcurrentFaceAnalysis(b *testing.B) {
 	}
 
 	// アナライザーの初期化
-	analyzer := analyzer.New(&cascade)
+	analyzer := analyzer.New(&cascade, "", "", false)
 
 	// テスト画像の生成
 	imgData := generateTestImage(b, 640, 480)
@@ -120,7 +120,7 @@ func BenchmarkHTTPEndpoint(b *testing.B) {
 		b.Fatal("カスケード分類器の読み込みに失敗")
 	}
 
-	analyzer := analyzer.New(&cascade)
+	analyzer := analyzer.New(&cascade, "", "", false)
 	handler := handler.NewFaceHandler(nil, analyzer)
 
 	// テストサーバー
@@ -159,7 +159,7 @@ func BenchmarkMemoryUsage(b *testing.B) {
 		b.Fatal("カスケード分類器の読み込みに失敗")
 	}
 
-	analyzer := analyzer.New(&cascade)
+	analyzer := analyzer.New(&cascade, "", "", false)
 
 	// 異なるサイズの画像でテスト
 	sizes := []struct {
@@ -195,7 +195,7 @@ func BenchmarkTimeoutHandling(b *testing.B) {
 		b.Fatal("カスケード分類器の読み込みに失敗")
 	}
 
-	analyzer := analyzer.New(&cascade)
+	analyzer := analyzer.New(&cascade, "", "", false)
 	imgData := generateTestImage(b, 1920, 1080) // 大きなサイズの画像を使用
 
 	b.ResetTimer()

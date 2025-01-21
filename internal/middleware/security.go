@@ -27,11 +27,11 @@ const (
 	nonceLength       = 32               // CSPノンスの長さ
 )
 
-// contextKey はコンテキストキーのカスタム型
+// コンテキストキーのカスタム型
 type contextKey string
 
 const (
-	// CSPNonceKey はCSPノンスのコンテキストキー
+	// CSPノンスのコンテキストキー
 	CSPNonceKey contextKey = "csp-nonce"
 )
 

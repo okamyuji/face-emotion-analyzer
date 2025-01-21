@@ -11,6 +11,7 @@ import (
 
 	"github.com/okamyuji/face-emotion-analyzer/internal/analyzer"
 	"github.com/okamyuji/face-emotion-analyzer/internal/middleware"
+	"gocv.io/x/gocv"
 )
 
 type FaceHandler struct {
@@ -23,9 +24,10 @@ type AnalyzeRequest struct {
 }
 
 type AnalyzeResponse struct {
-	Emotion    string       `json:"emotion"`
-	Confidence float64      `json:"confidence"`
-	Faces      []FaceRegion `json:"faces"`
+	Emotion        string       `json:"emotion"`
+	Confidence     float64      `json:"confidence"`
+	Faces          []FaceRegion `json:"faces"`
+	ProcessedImage string       `json:"processedImage"` // Base64エンコードされた画像
 }
 
 type ErrorResponse struct {
@@ -223,17 +225,46 @@ func (h *FaceHandler) HandleAnalyze(w http.ResponseWriter, r *http.Request) {
 	// レスポンスの構築
 	response := AnalyzeResponse{
 		Emotion:    EmotionToString(results.PrimaryEmotion),
-		Confidence: results.Confidence,
+		Confidence: float64(results.Confidence),
 		Faces:      make([]FaceRegion, len(results.Faces)),
 	}
 
-	for i, face := range results.Faces {
-		response.Faces[i] = FaceRegion{
-			X:      face.X,
-			Y:      face.Y,
-			Width:  face.Width,
-			Height: face.Height,
+	// 画像の元のサイズを取得
+	imgWidth := float64(0)
+	imgHeight := float64(0)
+	if len(results.Faces) > 0 {
+		// 画像の元のサイズを取得（ProcessedImageDataから）
+		img, err := gocv.IMDecode(results.ProcessedImageData, gocv.IMReadUnchanged)
+		if err == nil {
+			defer img.Close()
+			imgWidth = float64(img.Cols())
+			imgHeight = float64(img.Rows())
 		}
+	}
+
+	// 座標を正規化（0-1の範囲に変換）
+	for i, face := range results.Faces {
+		if imgWidth > 0 && imgHeight > 0 {
+			response.Faces[i] = FaceRegion{
+				X:      face.X / imgWidth,
+				Y:      face.Y / imgHeight,
+				Width:  face.Width / imgWidth,
+				Height: face.Height / imgHeight,
+			}
+		} else {
+			// 画像サイズが取得できない場合は元の値をそのまま使用
+			response.Faces[i] = FaceRegion{
+				X:      face.X,
+				Y:      face.Y,
+				Width:  face.Width,
+				Height: face.Height,
+			}
+		}
+	}
+
+	// 処理済み画像データをBase64エンコードしてレスポンスに追加
+	if len(results.ProcessedImageData) > 0 {
+		response.ProcessedImage = "data:image/jpeg;base64," + base64.StdEncoding.EncodeToString(results.ProcessedImageData)
 	}
 
 	// JSONレスポンスの送信

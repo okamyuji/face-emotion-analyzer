@@ -14,6 +14,7 @@ import (
 	"github.com/okamyuji/face-emotion-analyzer/internal/analyzer"
 	"github.com/okamyuji/face-emotion-analyzer/internal/handler"
 	"github.com/okamyuji/face-emotion-analyzer/internal/middleware"
+	"github.com/okamyuji/face-emotion-analyzer/internal/resource"
 
 	"gocv.io/x/gocv"
 )
@@ -40,22 +41,78 @@ func main() {
 	// 環境とロギングの初期化
 	logger := initEnvironment()
 
-	// 顔認識の初期化
-	cascade, err := initFaceDetection(logger)
-	if err != nil {
-		os.Exit(1)
-	}
+	// カスケード分類器の準備
+	cascade := gocv.NewCascadeClassifier()
 	defer cascade.Close()
 
-	// ハンドラーの初期化
-	if err := initHandlers(logger, &cascade); err != nil {
+	cascadePath := resource.ResolvePath("models/haarcascade_frontalface_default.xml")
+	if !cascade.Load(cascadePath) {
+		logger.Error("カスケード分類器の読み込みに失敗")
 		os.Exit(1)
 	}
 
-	// サーバーの初期化と起動
-	server := initServer(logger)
+	// セキュリティミドルウェアの初期化
+	securityMiddleware := middleware.NewSecurityMiddleware(&config.SecurityConfig{
+		AllowedOrigins:  "http://localhost:8080",
+		CSRFTokenLength: 32,
+		RateLimit: config.RateLimitConfig{
+			RequestsPerMinute: 1000,
+			Burst:             100,
+		},
+		CORS: config.CORSConfig{
+			AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+			AllowedHeaders: []string{"Content-Type", "X-CSRF-Token"},
+			MaxAge:         86400,
+		},
+	})
+
+	// テンプレートレンダラーの初期化
+	renderer, err := handler.NewTemplateRenderer(resource.ResolvePath("web/templates/*.html"))
+	if err != nil {
+		logger.Error("テンプレートレンダラーの初期化に失敗", "error", err)
+		os.Exit(1)
+	}
+
+	// 顔検出器の初期化
+	faceAnalyzer := analyzer.New(&cascade, "", "", false)
+
+	// ハンドラーの初期化
+	faceHandler := handler.NewFaceHandler(renderer, faceAnalyzer)
+	healthHandler := handler.NewHealthHandler(logger)
+
+	// ルーティングの設定
+	mux := http.NewServeMux()
+	mux.Handle("/", securityMiddleware.Middleware(faceHandler.Handle))
+	mux.Handle("/analyze", securityMiddleware.Middleware(http.HandlerFunc(faceHandler.HandleAnalyze)))
+	mux.HandleFunc("/health", healthHandler.Handle)
+
+	// 静的ファイルの提供
+	fs := http.FileServer(http.Dir(resource.ResolvePath("web/static")))
+	mux.Handle("/static/", http.StripPrefix("/static/", securityMiddleware.Middleware(http.HandlerFunc(fs.ServeHTTP))))
+
+	// faviconのハンドリング
+	mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, resource.ResolvePath("web/static/img/favicon.ico"))
+	})
+
+	// サーバーの設定
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	// 環境変数からポートを取得
+	if port := os.Getenv("PORT"); port != "" {
+		server.Addr = ":" + port
+	}
+
+	// サーバーの起動
+	logger.Info("サーバーを起動します", "port", server.Addr)
 	if err := server.ListenAndServe(); err != nil {
-		logger.Error("サーバー起動失敗", "error", err)
+		logger.Error("サーバーの起動に失敗", "error", err)
 		os.Exit(1)
 	}
 }
@@ -102,81 +159,4 @@ func initEnvironment() *slog.Logger {
 	slog.SetDefault(logger)
 
 	return logger
-}
-
-// 顔認識の初期化
-func initFaceDetection(logger *slog.Logger) (gocv.CascadeClassifier, error) {
-	// 顔認識用のカスケード分類器を読み込み
-	cascade := gocv.NewCascadeClassifier()
-	if !cascade.Load("../../models/haarcascade_frontalface_default.xml") {
-		logger.Error("カスケード分類器の読み込みに失敗")
-		return cascade, fmt.Errorf("カスケード分類器の読み込みに失敗")
-	}
-
-	return cascade, nil
-}
-
-func initHandlers(logger *slog.Logger, cascade *gocv.CascadeClassifier) error {
-	// テンプレートレンダラーの初期化
-	templateRenderer, err := handler.NewTemplateRenderer("../../web/templates/*.html")
-	if err != nil {
-		logger.Error("テンプレートレンダラーの初期化に失敗", "error", err)
-		return err
-	}
-
-	// セキュリティミドルウェアの初期化
-	securityMiddleware := middleware.NewSecurityMiddleware(&config.SecurityConfig{
-		AllowedOrigins:  "http://localhost:8080",
-		CSRFTokenLength: 32,
-		RateLimit: config.RateLimitConfig{
-			RequestsPerMinute: 1000,
-			Burst:             100,
-		},
-		CORS: config.CORSConfig{
-			AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-			AllowedHeaders: []string{"Content-Type", "X-CSRF-Token"},
-			MaxAge:         86400,
-		},
-	})
-
-	// 顔認識アナライザーの初期化
-	cascadePtr := cascade
-	analyzer := analyzer.New(cascadePtr)
-
-	// 依存性注入を使用した顔認識ハンドラー
-	faceHandler := handler.NewFaceHandler(templateRenderer, analyzer)
-
-	// ヘルスチェックハンドラーの初期化
-	healthHandler := handler.NewHealthHandler(logger)
-
-	// ヘルスチェックエンドポイント
-	http.HandleFunc("/health", healthHandler.Handle)
-
-	// メインの顔認識ハンドラー
-	http.HandleFunc("/", securityMiddleware.Middleware(faceHandler.Handle))
-
-	// 画像アップロードエンドポイント
-	http.HandleFunc("/analyze", securityMiddleware.Middleware(faceHandler.HandleAnalyze))
-
-	// セキュリティヘッダー付きの静的ファイル配信
-	fs := http.FileServer(http.Dir("../../web/static"))
-	http.Handle("/static/", http.StripPrefix("/static/", securityMiddleware.Middleware(http.HandlerFunc(fs.ServeHTTP))))
-
-	// faviconのハンドリング
-	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "../../web/static/img/favicon.ico")
-	})
-
-	return nil
-}
-
-// サーバーの初期化
-func initServer(logger *slog.Logger) *http.Server {
-	logger.Info("サーバーを初期化中", "port", "8080")
-	return &http.Server{
-		Addr:         ":8080",
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
 }

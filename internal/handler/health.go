@@ -5,19 +5,19 @@ import (
 	"net/http"
 )
 
-// HealthHandler はヘルスチェックエンドポイントのハンドラー
+// ヘルスチェックエンドポイントのハンドラー
 type HealthHandler struct {
 	logger *slog.Logger
 }
 
-// NewHealthHandler は新しいHealthHandlerを作成します
+// 新しいHealthHandlerを作成します
 func NewHealthHandler(logger *slog.Logger) *HealthHandler {
 	return &HealthHandler{
 		logger: logger,
 	}
 }
 
-// Handle はヘルスチェックリクエストを処理します
+// ヘルスチェックリクエストを処理します
 func (h *HealthHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write([]byte("OK")); err != nil {

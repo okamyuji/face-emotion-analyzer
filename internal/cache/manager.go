@@ -9,14 +9,14 @@ import (
 	"github.com/okamyuji/face-emotion-analyzer/internal/errors"
 )
 
-// Item はキャッシュアイテムを表す
+// キャッシュアイテムを表す
 type Item struct {
 	Value      interface{}
 	Expiration time.Time
 	Size       int64
 }
 
-// Stats はキャッシュの統計情報を表す
+// キャッシュの統計情報を表す
 type Stats struct {
 	ItemCount    int
 	CurrentSize  int64
@@ -24,7 +24,7 @@ type Stats struct {
 	UsagePercent float64
 }
 
-// Manager の定義を拡張
+// キャッシュマネージャー
 type Manager struct {
 	mu              sync.RWMutex
 	items           map[string]Item
@@ -34,13 +34,13 @@ type Manager struct {
 	done            chan struct{}
 }
 
-// Config はキャッシュマネージャーの設定を表す
+// キャッシュマネージャーの設定を表す
 type Config struct {
 	MaxSize         int64
 	CleanupInterval time.Duration
 }
 
-// evict メソッドの実装を追加
+// 必要なサイズが確保できるまで削除
 func (m *Manager) evict(requiredSize int64) {
 	type itemInfo struct {
 		key        string
@@ -122,7 +122,7 @@ func (m *Manager) GetStats() Stats {
 	}
 }
 
-// NewManager は新しいキャッシュマネージャーを作成します
+// 新しいキャッシュマネージャーを作成
 func NewManager(cfg Config) *Manager {
 	m := &Manager{
 		items:           make(map[string]Item),
@@ -135,7 +135,7 @@ func NewManager(cfg Config) *Manager {
 	return m
 }
 
-// startCleanup は期限切れアイテムの定期的なクリーンアップを開始します
+// 期限切れアイテムの定期的なクリーンアップを開始
 func (m *Manager) startCleanup() {
 	ticker := time.NewTicker(m.cleanupInterval)
 	defer ticker.Stop()
@@ -150,7 +150,7 @@ func (m *Manager) startCleanup() {
 	}
 }
 
-// cleanup は期限切れのアイテムを削除します
+// 期限切れのアイテムを削除します
 func (m *Manager) cleanup() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -164,7 +164,7 @@ func (m *Manager) cleanup() {
 	}
 }
 
-// Close はキャッシュマネージャーを停止します
+// キャッシュマネージャーの停止
 func (m *Manager) Close() error {
 	select {
 	case <-m.done:
@@ -176,7 +176,7 @@ func (m *Manager) Close() error {
 	}
 }
 
-// Clear はキャッシュの内容をすべて削除します
+// キャッシュの内容をすべて削除
 func (m *Manager) Clear() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -185,12 +185,12 @@ func (m *Manager) Clear() {
 	m.currentSize = 0
 }
 
-// isExpired は項目が期限切れかどうかを判定します
+// 項目が期限切れかどうかを判定
 func (i Item) isExpired() bool {
 	return time.Now().After(i.Expiration)
 }
 
-// Get はキーに対応する値を取得します
+// キーに対応する値を取得します
 func (m *Manager) Get(ctx context.Context, key string) (interface{}, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -202,7 +202,7 @@ func (m *Manager) Get(ctx context.Context, key string) (interface{}, error) {
 	return item.Value, nil
 }
 
-// Set はキーと値をキャッシュに設定します
+// キーと値をキャッシュに設定します
 func (m *Manager) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -228,7 +228,7 @@ func (m *Manager) Set(ctx context.Context, key string, value interface{}, ttl ti
 	return nil
 }
 
-// GetOrCompute はキーに対応する値を取得し、存在しない場合は計算して設定します
+// キーに対応する値を取得し、存在しない場合は計算して設定します
 func (m *Manager) GetOrCompute(ctx context.Context, key string, compute func() (interface{}, error), ttl time.Duration) (interface{}, error) {
 	value, err := m.Get(ctx, key)
 	if err == nil {

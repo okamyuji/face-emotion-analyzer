@@ -8,7 +8,7 @@ import (
 	"github.com/okamyuji/face-emotion-analyzer/internal/analyzer"
 )
 
-// TemplateData はテンプレートに渡すデータ構造体
+// テンプレートに渡すデータ構造体
 type TemplateData struct {
 	CSPNonce  string
 	CSRFToken string
